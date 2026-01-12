@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "name": "quantization-mcp",
+  "description": "Stock Technical Indicators MCP Server",
+  "mcpServers": {
+    "quantization": {
+      "command": "./build/quantization-mcp",
+      "args": [],
+      "env": {
+        "MARKET_DATA_API": "http://localhost:8080/api"
+      }
+    }
+  },
+  "indicators": {
+    "moving_averages": [
+      "sma_5", "sma_10", "sma_20", "sma_50", "sma_200",
+      "ema_5", "ema_10", "ema_12", "ema_20", "ema_26", "ema_50"
+    ],
+    "momentum": [
+      "rsi_14", "rsi_9",
+      "macd", "macd_fast"
+    ],
+    "volatility": [
+      "bb_20", "bb_20_3std",
+      "atr_14"
+    ],
+    "oscillators": [
+      "stoch_14_3", "stoch_5_3",
+      "williams_r_14"
+    ],
+    "trend": [
+      "adx_14",
+      "cci_20", "cci_14"
+    ],
+    "volume": [
+      "obv"
+    ]
+  }
+}
