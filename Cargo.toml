@@ -1,6 +1,11 @@
 [workspace]
 resolver = "2"
-members = ["crates/tg-contracts", "crates/tg-persistence", "crates/tg-market-data"]
+members = [
+    "crates/tg-contracts",
+    "crates/tg-persistence",
+    "crates/tg-market-data",
+    "crates/tg-factor-engine",
+]
 
 [workspace.package]
 edition = "2021"
@@ -12,6 +17,7 @@ authors = ["TradeGlance"]
 tg-contracts = { path = "crates/tg-contracts" }
 tg-persistence = { path = "crates/tg-persistence" }
 tokio = { version = "1.48", features = ["full"] }
+tokio-stream = "0.1.17"
 tokio-util = { version = "0.7.17", features = ["rt"] }
 tonic = "0.8.3"
 prost = "0.11.9"
@@ -35,3 +41,4 @@ axum = "0.8.7"
 sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio-rustls", "postgres", "macros", "migrate", "chrono", "rust_decimal"] }
 arrow = "56"
 parquet = { version = "56", features = ["arrow"] }
+ndarray = "0.16.1"

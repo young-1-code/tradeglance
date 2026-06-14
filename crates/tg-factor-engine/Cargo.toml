@@ -1,0 +1,41 @@
+[package]
+name = "tg-factor-engine"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[features]
+default = []
+pg_integration = []
+
+[lib]
+name = "tg_factor_engine"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tg-factor-engine"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+arrow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+ndarray.workspace = true
+parquet.workspace = true
+prost.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tg-contracts.workspace = true
+tg-persistence.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tempfile = "3.23.0"
