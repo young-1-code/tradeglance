@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/tg-contracts"]
+members = ["crates/tg-contracts", "crates/tg-persistence"]
 
 [workspace.package]
 edition = "2021"
@@ -9,7 +9,9 @@ license = "MIT"
 authors = ["TradeGlance"]
 
 [workspace.dependencies]
+tg-contracts = { path = "crates/tg-contracts" }
 tokio = { version = "1.48", features = ["full"] }
+tokio-util = "0.7.17"
 tonic = "0.8.3"
 prost = "0.11.9"
 prost-types = "0.11.9"
@@ -19,8 +21,11 @@ chrono = { version = "0.4.44", features = ["serde"] }
 chrono-tz = "0.8.6"
 thiserror = "2.0.18"
 anyhow = "1.0.100"
+async-trait = "0.1.89"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 tracing = "0.1.44"
 bytes = "1.11.0"
-
+sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio-rustls", "postgres", "macros", "migrate", "chrono", "rust_decimal"] }
+arrow = "56"
+parquet = { version = "56", features = ["arrow"] }
