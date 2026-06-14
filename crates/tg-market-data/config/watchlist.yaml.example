@@ -1,0 +1,5 @@
+symbols:
+  - symbol: "600519"
+    strategy_tags: ["swing"]
+  - symbol: "159915"
+    strategy_tags: ["t0", "limitup"]
