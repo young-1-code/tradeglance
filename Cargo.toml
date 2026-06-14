@@ -5,6 +5,7 @@ members = [
     "crates/tg-persistence",
     "crates/tg-market-data",
     "crates/tg-factor-engine",
+    "crates/tg-engine",
 ]
 
 [workspace.package]

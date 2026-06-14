@@ -3212,6 +3212,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "rust_decimal",
+ "tg-contracts",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "tg-factor-engine"
 version = "0.1.0"
 dependencies = [
