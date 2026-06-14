@@ -18,6 +18,7 @@
 | 2026-06-14 | v0.6 | Phase 0 设计决策 | tg-persistence 定为共享库 crate（ADR-017）；Python sidecar 用 HTTP/FastAPI（ADR-018）；Phase 0 详细设计成文 |
 | 2026-06-14 | v0.7 | 全模块详细设计 | tg-contracts 权威 spec 成文；Phase 1-4 详细设计 spec 全部成文；新增 ADR-019~037；Q7/Q8 决策落地（ADR-019/020）；跨模块类型对齐（OrderIntent 入 contracts，ExecutionHandler 统一签名） |
 | 2026-06-14 | v0.8 | Phase 0 编码完成 | tg-contracts/tg-persistence/tg-market-data 三 crate 由 codex(gpt-5.5) 全自动实现 + 人工审阅（unit/clippy 全绿）并提交；cargo 镜像切换 rsproxy-sparse；集成测试(pg_integration)待 Postgres、真实 akshare 烟测 `#[ignore]`；环境备注：系统盘持续 ~98% 满，Phase 1 构建前需腾空间 |
+| 2026-06-14 | v0.9 | Phase 1 编码完成 | tg-factor-engine（Rust，10 tests）+ tg-indicators（C++20 gRPC，13 tests）由 codex 实现并提交；7 因子族 + 横截面 rank/IC/IR/decay/分层 + 11 指标齐备；磁盘腾出后平稳；跨服务 gRPC 联调（ADR-022 RSI 因子经 indicators）待接入 |
 
 ---
 
@@ -455,7 +456,7 @@ Phase 4 可视编排  → monitoring-viz + infra
 | Phase | 模块 | 设计 spec | 编码 |
 |---|---|---|---|
 | 0 | tg-contracts / tg-market-data / tg-persistence | ✅ 完成 | 🚧 三 crate 已实现+unit/clippy 绿（a9c72d3/4ecda53/7ae52e5）；集成测试待 Postgres |
-| 1 | tg-indicators / tg-factor-engine | ✅ 完成 | ⬜ 待启动 |
+| 1 | tg-indicators / tg-factor-engine | ✅ 完成 | 🚧 已实现+tests 绿（4d40263/a616ee3）；跨服务 gRPC 联调待接入 |
 | 2 | tg-engine / tg-backtest / tg-signal-engine | ✅ 完成 | ⬜ 待启动 |
 | 3 | tg-decision-agent / tg-mock-order-engine | ✅ 完成 | ⬜ 待启动 |
 | 4 | tg-monitoring-viz / tg-infra | ✅ 完成 | ⬜ 待启动 |
