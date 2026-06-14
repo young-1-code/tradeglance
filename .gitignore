@@ -1,0 +1,12 @@
+# Rust build artifacts
+/target
+**/*.rs.bk
+
+# Vendored dependency fallbacks (prefer the configured cargo mirror)
+/vendor
+
+# Environment / IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store

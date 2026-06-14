@@ -1,0 +1,476 @@
+syntax = "proto3";
+
+package tg.v1;
+
+enum Exchange {
+  EXCHANGE_UNSPECIFIED = 0;
+  EXCHANGE_SH = 1;
+  EXCHANGE_SZ = 2;
+  EXCHANGE_BJ = 3;
+}
+
+enum InstrumentType {
+  INSTRUMENT_TYPE_UNSPECIFIED = 0;
+  INSTRUMENT_TYPE_STOCK = 1;
+  INSTRUMENT_TYPE_ETF = 2;
+}
+
+enum Board {
+  BOARD_UNSPECIFIED = 0;
+  BOARD_MAIN_BOARD = 1;
+  BOARD_STAR = 2;
+  BOARD_CHI_NEXT = 3;
+  BOARD_BJ = 4;
+}
+
+enum BarPeriod {
+  BAR_PERIOD_UNSPECIFIED = 0;
+  BAR_PERIOD_DAILY = 1;
+  BAR_PERIOD_MIN1 = 2;
+  BAR_PERIOD_MIN5 = 3;
+}
+
+enum Adjustment {
+  ADJUSTMENT_UNSPECIFIED = 0;
+  ADJUSTMENT_NONE = 1;
+  ADJUSTMENT_PRE_ADJUST = 2;
+  ADJUSTMENT_POST_ADJUST = 3;
+}
+
+enum OrderSide {
+  ORDER_SIDE_UNSPECIFIED = 0;
+  ORDER_SIDE_BUY = 1;
+  ORDER_SIDE_SELL = 2;
+}
+
+enum OrderType {
+  ORDER_TYPE_UNSPECIFIED = 0;
+  ORDER_TYPE_LIMIT = 1;
+  ORDER_TYPE_MARKET = 2;
+}
+
+enum TimeInForce {
+  TIME_IN_FORCE_UNSPECIFIED = 0;
+  TIME_IN_FORCE_DAY = 1;
+  TIME_IN_FORCE_GTC = 2;
+}
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_NEW = 1;
+  ORDER_STATUS_PARTIALLY_FILLED = 2;
+  ORDER_STATUS_FILLED = 3;
+  ORDER_STATUS_CANCELLED = 4;
+  ORDER_STATUS_REJECTED = 5;
+}
+
+enum SignalDirection {
+  SIGNAL_DIRECTION_UNSPECIFIED = 0;
+  SIGNAL_DIRECTION_LONG = 1;
+  SIGNAL_DIRECTION_SHORT = 2;
+  SIGNAL_DIRECTION_FLAT = 3;
+  SIGNAL_DIRECTION_CLOSE_LONG = 4;
+  SIGNAL_DIRECTION_CLOSE_SHORT = 5;
+}
+
+enum StrategyStyle {
+  STRATEGY_STYLE_UNSPECIFIED = 0;
+  STRATEGY_STYLE_SWING = 1;
+  STRATEGY_STYLE_T0 = 2;
+  STRATEGY_STYLE_LIMIT_UP = 3;
+}
+
+enum DecisionAction {
+  DECISION_ACTION_UNSPECIFIED = 0;
+  DECISION_ACTION_OPEN = 1;
+  DECISION_ACTION_ADD = 2;
+  DECISION_ACTION_REDUCE = 3;
+  DECISION_ACTION_CLOSE = 4;
+  DECISION_ACTION_HOLD = 5;
+}
+
+enum EventKind {
+  EVENT_KIND_UNSPECIFIED = 0;
+  EVENT_KIND_BAR = 1;
+  EVENT_KIND_SNAPSHOT = 2;
+  EVENT_KIND_TIMER = 3;
+  EVENT_KIND_FILL = 4;
+}
+
+message Empty {}
+
+message Instrument {
+  string symbol = 1;
+  Exchange exchange = 2;
+  InstrumentType instrument_type = 3;
+  string name = 4;
+  string list_date = 5;
+  string delist_date = 6;
+  bool is_st = 7;
+  Board board = 8;
+}
+
+message Bar {
+  string symbol = 1;
+  Exchange exchange = 2;
+  BarPeriod period = 3;
+  int64 ts_epoch_millis = 4;
+  string trading_date = 5;
+  string open = 6;
+  string high = 7;
+  string low = 8;
+  string close = 9;
+  int64 volume = 10;
+  string amount = 11;
+}
+
+message Snapshot {
+  string symbol = 1;
+  Exchange exchange = 2;
+  int64 ts_epoch_millis = 3;
+  string trading_date = 4;
+  string last = 5;
+  string open = 6;
+  string high = 7;
+  string low = 8;
+  string pre_close = 9;
+  int64 volume = 10;
+  string amount = 11;
+  repeated string bid_price = 12;
+  repeated int64 bid_volume = 13;
+  repeated string ask_price = 14;
+  repeated int64 ask_volume = 15;
+}
+
+message AdjustmentFactor {
+  string symbol = 1;
+  string ex_date = 2;
+  string factor = 3;
+}
+
+message TradingCalendar {
+  string date = 1;
+  bool is_trading_day = 2;
+}
+
+message OrderIntent {
+  string client_order_id = 1;
+  string symbol = 2;
+  Exchange exchange = 3;
+  OrderSide side = 4;
+  OrderType order_type = 5;
+  string price = 6;
+  bool has_price = 7;
+  int64 quantity = 8;
+  TimeInForce time_in_force = 9;
+  StrategyStyle strategy_tag = 10;
+}
+
+message Order {
+  string id = 1;
+  string client_order_id = 2;
+  string symbol = 3;
+  Exchange exchange = 4;
+  OrderSide side = 5;
+  OrderType order_type = 6;
+  string price = 7;
+  bool has_price = 8;
+  int64 quantity = 9;
+  TimeInForce time_in_force = 10;
+  StrategyStyle strategy_tag = 11;
+  int64 created_at_epoch_millis = 12;
+  OrderStatus status = 13;
+  int64 filled_quantity = 14;
+  string avg_fill_price = 15;
+}
+
+message Fill {
+  string order_id = 1;
+  string fill_id = 2;
+  string symbol = 3;
+  Exchange exchange = 4;
+  OrderSide side = 5;
+  string price = 6;
+  int64 quantity = 7;
+  string commission = 8;
+  string tax = 9;
+  string transfer_fee = 10;
+  int64 ts_epoch_millis = 11;
+  string trading_date = 12;
+}
+
+message Position {
+  string symbol = 1;
+  Exchange exchange = 2;
+  int64 total_quantity = 3;
+  int64 t1_locked_quantity = 4;
+  int64 available_quantity = 5;
+  string avg_cost = 6;
+  string last_price = 7;
+  string market_value = 8;
+  string unrealized_pnl = 9;
+}
+
+message Account {
+  string cash = 1;
+  string frozen_cash = 2;
+  string total_value = 3;
+  map<string, Position> positions = 4;
+}
+
+message IndicatorRequest {
+  string indicator = 1;
+  map<string, double> params = 2;
+  repeated Bar bars = 3;
+}
+
+message IndicatorResult {
+  string indicator = 1;
+  repeated int64 ts_epoch_millis = 2;
+  map<string, DoubleSeries> series = 3;
+}
+
+message DoubleSeries {
+  repeated double values = 1;
+}
+
+message FactorValue {
+  string symbol = 1;
+  string factor = 2;
+  int64 ts_epoch_millis = 3;
+  string trading_date = 4;
+  double value = 5;
+  uint32 rank = 6;
+  bool has_rank = 7;
+}
+
+message FactorEvaluation {
+  string factor = 1;
+  double ic_mean = 2;
+  double ic_std = 3;
+  double ir = 4;
+  repeated double decay = 5;
+  repeated double quantile_returns = 6;
+}
+
+message Signal {
+  string id = 1;
+  string symbol = 2;
+  Exchange exchange = 3;
+  SignalDirection direction = 4;
+  double strength = 5;
+  double confidence = 6;
+  StrategyStyle style = 7;
+  repeated string reason = 8;
+  int64 suggested_quantity = 9;
+  bool has_suggested_quantity = 10;
+  int64 ts_epoch_millis = 11;
+  string trading_date = 12;
+}
+
+message RiskCheckResult {
+  string rule = 1;
+  bool passed = 2;
+  string detail = 3;
+}
+
+message Decision {
+  string id = 1;
+  string signal_id = 2;
+  bool has_signal_id = 3;
+  string symbol = 4;
+  Exchange exchange = 5;
+  DecisionAction action = 6;
+  OrderSide side = 7;
+  int64 target_quantity = 8;
+  string rationale = 9;
+  repeated RiskCheckResult risk_checks = 10;
+  int64 ts_epoch_millis = 11;
+}
+
+message Event {
+  EventKind kind = 1;
+  Bar bar = 2;
+  Snapshot snapshot = 3;
+  int64 timer_epoch_millis = 4;
+  Fill fill = 5;
+}
+
+message BarQuery {
+  string symbol = 1;
+  BarPeriod period = 2;
+  int64 start_epoch_millis = 3;
+  int64 end_epoch_millis = 4;
+  Adjustment adjustment = 5;
+}
+
+message FullSyncRequest {
+  repeated string symbols = 1;
+}
+
+message SyncJob {
+  string id = 1;
+  string status = 2;
+  int64 created_at_epoch_millis = 3;
+}
+
+message SyncStatusReport {
+  repeated SyncStatus statuses = 1;
+}
+
+message SyncStatus {
+  string symbol = 1;
+  BarPeriod period = 2;
+  string status = 3;
+  int64 last_fetched_ts_epoch_millis = 4;
+  int64 last_sync_at_epoch_millis = 5;
+  string last_error = 6;
+}
+
+message WatchlistDelta {
+  repeated string add_symbols = 1;
+  repeated string remove_symbols = 2;
+}
+
+message Watchlist {
+  repeated string symbols = 1;
+}
+
+message ComputeFactorRequest {
+  string factor = 1;
+  repeated string symbols = 2;
+  BarQuery query = 3;
+}
+
+message ComputeFactorResponse {
+  repeated FactorValue values = 1;
+}
+
+message EvaluateFactorRequest {
+  string factor = 1;
+  BarQuery query = 2;
+}
+
+message QueryFactorValuesRequest {
+  string factor = 1;
+  repeated string symbols = 2;
+  int64 start_epoch_millis = 3;
+  int64 end_epoch_millis = 4;
+}
+
+message SubmitBacktestRequest {
+  string strategy = 1;
+  repeated string symbols = 2;
+  int64 start_epoch_millis = 3;
+  int64 end_epoch_millis = 4;
+  string config_json = 5;
+}
+
+message BacktestJob {
+  string id = 1;
+  string status = 2;
+  int64 created_at_epoch_millis = 3;
+}
+
+message GetBacktestStatusRequest {
+  string id = 1;
+}
+
+message BacktestStatus {
+  string id = 1;
+  string status = 2;
+  double progress = 3;
+  string error = 4;
+}
+
+message GetBacktestResultRequest {
+  string id = 1;
+}
+
+message BacktestResult {
+  string id = 1;
+  string status = 2;
+  string metrics_json = 3;
+}
+
+message SubscribeSignalsRequest {
+  repeated string symbols = 1;
+}
+
+message QuerySignalsRequest {
+  repeated string symbols = 1;
+  int64 start_epoch_millis = 2;
+  int64 end_epoch_millis = 3;
+}
+
+message QuerySignalsResponse {
+  repeated Signal signals = 1;
+}
+
+message DecisionRequest {
+  Signal signal = 1;
+  string context_json = 2;
+}
+
+message SubscribeDecisionsRequest {
+  repeated string symbols = 1;
+}
+
+message CancelOrderRequest {
+  string order_id = 1;
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+}
+
+message QueryPositionsRequest {
+  repeated string symbols = 1;
+}
+
+message QueryPositionsResponse {
+  repeated Position positions = 1;
+}
+
+service MarketDataControl {
+  rpc TriggerFullSync(FullSyncRequest) returns (SyncJob);
+  rpc TriggerIncrementalSync(Empty) returns (SyncJob);
+  rpc GetSyncStatus(Empty) returns (SyncStatusReport);
+  rpc UpdateWatchlist(WatchlistDelta) returns (Watchlist);
+  rpc GetWatchlist(Empty) returns (Watchlist);
+}
+
+service IndicatorService {
+  rpc Compute(IndicatorRequest) returns (IndicatorResult);
+  rpc BatchCompute(stream IndicatorRequest) returns (stream IndicatorResult);
+}
+
+service FactorService {
+  rpc ComputeFactor(ComputeFactorRequest) returns (ComputeFactorResponse);
+  rpc EvaluateFactor(EvaluateFactorRequest) returns (FactorEvaluation);
+  rpc QueryFactorValues(QueryFactorValuesRequest) returns (ComputeFactorResponse);
+}
+
+service BacktestService {
+  rpc SubmitBacktest(SubmitBacktestRequest) returns (BacktestJob);
+  rpc GetBacktestStatus(GetBacktestStatusRequest) returns (BacktestStatus);
+  rpc GetBacktestResult(GetBacktestResultRequest) returns (BacktestResult);
+}
+
+service SignalService {
+  rpc SubscribeSignals(SubscribeSignalsRequest) returns (stream Signal);
+  rpc QuerySignals(QuerySignalsRequest) returns (QuerySignalsResponse);
+}
+
+service DecisionService {
+  rpc Decide(DecisionRequest) returns (Decision);
+  rpc SubscribeDecisions(SubscribeDecisionsRequest) returns (stream Decision);
+}
+
+service OrderService {
+  rpc SubmitOrder(OrderIntent) returns (Order);
+  rpc CancelOrder(CancelOrderRequest) returns (Order);
+  rpc GetOrder(GetOrderRequest) returns (Order);
+  rpc QueryPositions(QueryPositionsRequest) returns (QueryPositionsResponse);
+  rpc QueryAccount(Empty) returns (Account);
+}
