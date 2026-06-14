@@ -3,7 +3,9 @@ use std::path::PathBuf;
 use async_trait::async_trait;
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
+use serde_json::Value;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::types::Json;
 use sqlx::{PgPool, Row};
 use tg_contracts::{
     Adjustment, AdjustmentFactor, Bar, BarQuery, Instrument, Result, Snapshot, TgError,
@@ -22,6 +24,18 @@ pub struct WatchlistEntry {
     pub symbol: String,
     pub strategy_tags: Vec<String>,
     pub added_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct BacktestRunRecord {
+    pub id: String,
+    pub strategy: String,
+    pub symbols: Vec<String>,
+    pub config: Value,
+    pub status: String,
+    pub metrics: Option<Value>,
+    pub created_at: DateTime<Utc>,
+    pub finished_at: Option<DateTime<Utc>>,
 }
 
 #[async_trait]
@@ -66,6 +80,13 @@ pub trait FactorRepo: Send + Sync {
         start: NaiveDate,
         end: NaiveDate,
     ) -> Result<Vec<AdjustmentFactor>>;
+}
+
+#[async_trait]
+pub trait BacktestRunRepo: Send + Sync {
+    async fn save_run(&self, run: BacktestRunRecord) -> Result<()>;
+    async fn get_run(&self, id: &str) -> Result<Option<BacktestRunRecord>>;
+    async fn list_runs(&self) -> Result<Vec<BacktestRunRecord>>;
 }
 
 #[derive(Debug, Clone)]
@@ -398,6 +419,70 @@ impl FactorRepo for PostgresStore {
     }
 }
 
+#[async_trait]
+impl BacktestRunRepo for PostgresStore {
+    async fn save_run(&self, run: BacktestRunRecord) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO backtest_runs (
+                id, strategy, symbols, config, status, metrics, created_at, finished_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ON CONFLICT (id) DO UPDATE SET
+                strategy = EXCLUDED.strategy,
+                symbols = EXCLUDED.symbols,
+                config = EXCLUDED.config,
+                status = EXCLUDED.status,
+                metrics = EXCLUDED.metrics,
+                finished_at = EXCLUDED.finished_at
+            "#,
+        )
+        .bind(&run.id)
+        .bind(&run.strategy)
+        .bind(&run.symbols)
+        .bind(Json(run.config))
+        .bind(&run.status)
+        .bind(run.metrics.map(Json))
+        .bind(run.created_at)
+        .bind(run.finished_at)
+        .execute(&self.pool)
+        .await
+        .map_err(other_error)?;
+        Ok(())
+    }
+
+    async fn get_run(&self, id: &str) -> Result<Option<BacktestRunRecord>> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, strategy, symbols, config, status, metrics, created_at, finished_at
+            FROM backtest_runs
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(other_error)?;
+
+        row.map(backtest_run_from_row).transpose()
+    }
+
+    async fn list_runs(&self) -> Result<Vec<BacktestRunRecord>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, strategy, symbols, config, status, metrics, created_at, finished_at
+            FROM backtest_runs
+            ORDER BY created_at DESC, id DESC
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(other_error)?;
+
+        rows.into_iter().map(backtest_run_from_row).collect()
+    }
+}
+
 pub fn should_replace_latest_snapshot(
     existing_ts: Option<DateTime<Utc>>,
     incoming_ts: DateTime<Utc>,
@@ -493,6 +578,27 @@ fn adjustment_factor_from_row(row: sqlx::postgres::PgRow) -> Result<AdjustmentFa
         symbol: row.try_get("symbol").map_err(other_error)?,
         ex_date: row.try_get("ex_date").map_err(other_error)?,
         factor: row.try_get("factor").map_err(other_error)?,
+    })
+}
+
+fn backtest_run_from_row(row: sqlx::postgres::PgRow) -> Result<BacktestRunRecord> {
+    let config = row
+        .try_get::<Json<Value>, _>("config")
+        .map_err(other_error)?
+        .0;
+    let metrics = row
+        .try_get::<Option<Json<Value>>, _>("metrics")
+        .map_err(other_error)?
+        .map(|json| json.0);
+    Ok(BacktestRunRecord {
+        id: row.try_get("id").map_err(other_error)?,
+        strategy: row.try_get("strategy").map_err(other_error)?,
+        symbols: row.try_get("symbols").map_err(other_error)?,
+        config,
+        status: row.try_get("status").map_err(other_error)?,
+        metrics,
+        created_at: row.try_get("created_at").map_err(other_error)?,
+        finished_at: row.try_get("finished_at").map_err(other_error)?,
     })
 }
 

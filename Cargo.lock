@@ -3195,6 +3195,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-backtest"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "prost",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tg-contracts",
+ "tg-engine",
+ "tg-persistence",
+ "thiserror",
+ "tokio",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "tg-contracts"
 version = "0.1.0"
 dependencies = [
@@ -3284,6 +3305,7 @@ dependencies = [
  "chrono",
  "parquet",
  "rust_decimal",
+ "serde_json",
  "sqlx",
  "tempfile",
  "tg-contracts",

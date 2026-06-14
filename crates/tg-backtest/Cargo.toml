@@ -1,28 +1,33 @@
 [package]
-name = "tg-persistence"
+name = "tg-backtest"
 version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[lib]
+name = "tg_backtest"
+path = "src/lib.rs"
+
 [features]
 default = []
-pg_integration = []
+pg_integration = ["tg-persistence/pg_integration"]
 
 [dependencies]
 anyhow.workspace = true
-arrow.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
-parquet.workspace = true
+prost.workspace = true
 rust_decimal.workspace = true
+serde.workspace = true
 serde_json.workspace = true
-sqlx.workspace = true
 tg-contracts.workspace = true
+tg-engine = { path = "../tg-engine" }
+tg-persistence.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
-tokio-util.workspace = true
+tonic.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
