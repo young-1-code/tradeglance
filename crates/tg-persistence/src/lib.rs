@@ -19,5 +19,6 @@ pub use parquet_io::{
 };
 pub use repo::{
     should_replace_latest_snapshot, BacktestRunRecord, BacktestRunRepo, BarRepo, CalendarRepo,
-    FactorRepo, InstrumentRepo, PostgresStore, SnapshotRepo, WatchlistEntry,
+    DecisionAuditRecord, DecisionRepo, FactorRepo, InstrumentRepo, PostgresStore, SnapshotRepo,
+    WatchlistEntry,
 };

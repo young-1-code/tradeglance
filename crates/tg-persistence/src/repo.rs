@@ -8,8 +8,8 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::types::Json;
 use sqlx::{PgPool, Row};
 use tg_contracts::{
-    Adjustment, AdjustmentFactor, Bar, BarQuery, Instrument, Result, Snapshot, TgError,
-    TradingCalendar,
+    Adjustment, AdjustmentFactor, Bar, BarQuery, Decision, DecisionAction, Instrument, OrderSide,
+    Result, RiskCheckResult, Snapshot, TgError, TradingCalendar,
 };
 
 use crate::adjust::adjust_bars;
@@ -36,6 +36,14 @@ pub struct BacktestRunRecord {
     pub metrics: Option<Value>,
     pub created_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecisionAuditRecord {
+    pub decision: Decision,
+    pub analysis: Option<Value>,
+    pub pipeline_meta: Option<Value>,
+    pub source: String,
 }
 
 #[async_trait]
@@ -87,6 +95,16 @@ pub trait BacktestRunRepo: Send + Sync {
     async fn save_run(&self, run: BacktestRunRecord) -> Result<()>;
     async fn get_run(&self, id: &str) -> Result<Option<BacktestRunRecord>>;
     async fn list_runs(&self) -> Result<Vec<BacktestRunRecord>>;
+}
+
+#[async_trait]
+pub trait DecisionRepo: Send + Sync {
+    async fn save_decision(&self, record: DecisionAuditRecord) -> Result<()>;
+    async fn list_decisions(
+        &self,
+        symbol: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<DecisionAuditRecord>>;
 }
 
 #[derive(Debug, Clone)]
@@ -483,6 +501,94 @@ impl BacktestRunRepo for PostgresStore {
     }
 }
 
+#[async_trait]
+impl DecisionRepo for PostgresStore {
+    async fn save_decision(&self, record: DecisionAuditRecord) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO decisions (
+                id, signal_id, symbol, exchange, action, side, target_quantity,
+                rationale, risk_checks, analysis, pipeline_meta, source, ts
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+            ON CONFLICT (id) DO UPDATE SET
+                signal_id = EXCLUDED.signal_id,
+                symbol = EXCLUDED.symbol,
+                exchange = EXCLUDED.exchange,
+                action = EXCLUDED.action,
+                side = EXCLUDED.side,
+                target_quantity = EXCLUDED.target_quantity,
+                rationale = EXCLUDED.rationale,
+                risk_checks = EXCLUDED.risk_checks,
+                analysis = EXCLUDED.analysis,
+                pipeline_meta = EXCLUDED.pipeline_meta,
+                source = EXCLUDED.source,
+                ts = EXCLUDED.ts
+            "#,
+        )
+        .bind(&record.decision.id)
+        .bind(&record.decision.signal_id)
+        .bind(&record.decision.symbol)
+        .bind(exchange_to_str(record.decision.exchange))
+        .bind(decision_action_to_str(record.decision.action))
+        .bind(order_side_to_str(record.decision.side))
+        .bind(record.decision.target_quantity)
+        .bind(&record.decision.rationale)
+        .bind(Json(
+            serde_json::to_value(&record.decision.risk_checks).map_err(other_error)?,
+        ))
+        .bind(record.analysis.map(Json))
+        .bind(record.pipeline_meta.map(Json))
+        .bind(&record.source)
+        .bind(record.decision.ts)
+        .execute(&self.pool)
+        .await
+        .map_err(other_error)?;
+        Ok(())
+    }
+
+    async fn list_decisions(
+        &self,
+        symbol: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<DecisionAuditRecord>> {
+        let limit = limit.clamp(1, 500);
+        let rows = if let Some(symbol) = symbol {
+            sqlx::query(
+                r#"
+                SELECT id, signal_id, symbol, exchange, action, side, target_quantity,
+                       rationale, risk_checks, analysis, pipeline_meta, source, ts
+                FROM decisions
+                WHERE symbol = $1
+                ORDER BY ts DESC, id DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(symbol)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(other_error)?
+        } else {
+            sqlx::query(
+                r#"
+                SELECT id, signal_id, symbol, exchange, action, side, target_quantity,
+                       rationale, risk_checks, analysis, pipeline_meta, source, ts
+                FROM decisions
+                ORDER BY ts DESC, id DESC
+                LIMIT $1
+                "#,
+            )
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(other_error)?
+        };
+
+        rows.into_iter().map(decision_audit_from_row).collect()
+    }
+}
+
 pub fn should_replace_latest_snapshot(
     existing_ts: Option<DateTime<Utc>>,
     incoming_ts: DateTime<Utc>,
@@ -600,6 +706,82 @@ fn backtest_run_from_row(row: sqlx::postgres::PgRow) -> Result<BacktestRunRecord
         created_at: row.try_get("created_at").map_err(other_error)?,
         finished_at: row.try_get("finished_at").map_err(other_error)?,
     })
+}
+
+fn decision_audit_from_row(row: sqlx::postgres::PgRow) -> Result<DecisionAuditRecord> {
+    let exchange = row.try_get::<String, _>("exchange").map_err(other_error)?;
+    let action = row.try_get::<String, _>("action").map_err(other_error)?;
+    let side = row.try_get::<String, _>("side").map_err(other_error)?;
+    let risk_checks = row
+        .try_get::<Json<Value>, _>("risk_checks")
+        .map_err(other_error)?
+        .0;
+    let risk_checks =
+        serde_json::from_value::<Vec<RiskCheckResult>>(risk_checks).map_err(other_error)?;
+    let analysis = row
+        .try_get::<Option<Json<Value>>, _>("analysis")
+        .map_err(other_error)?
+        .map(|json| json.0);
+    let pipeline_meta = row
+        .try_get::<Option<Json<Value>>, _>("pipeline_meta")
+        .map_err(other_error)?
+        .map(|json| json.0);
+
+    Ok(DecisionAuditRecord {
+        decision: Decision {
+            id: row.try_get("id").map_err(other_error)?,
+            signal_id: row.try_get("signal_id").map_err(other_error)?,
+            symbol: row.try_get("symbol").map_err(other_error)?,
+            exchange: exchange_from_str(&exchange)?,
+            action: decision_action_from_str(&action)?,
+            side: order_side_from_str(&side)?,
+            target_quantity: row.try_get("target_quantity").map_err(other_error)?,
+            rationale: row.try_get("rationale").map_err(other_error)?,
+            risk_checks,
+            ts: row.try_get("ts").map_err(other_error)?,
+        },
+        analysis,
+        pipeline_meta,
+        source: row.try_get("source").map_err(other_error)?,
+    })
+}
+
+fn decision_action_to_str(action: DecisionAction) -> &'static str {
+    match action {
+        DecisionAction::Open => "Open",
+        DecisionAction::Add => "Add",
+        DecisionAction::Reduce => "Reduce",
+        DecisionAction::Close => "Close",
+        DecisionAction::Hold => "Hold",
+    }
+}
+
+fn decision_action_from_str(value: &str) -> Result<DecisionAction> {
+    match value {
+        "Open" | "open" => Ok(DecisionAction::Open),
+        "Add" | "add" => Ok(DecisionAction::Add),
+        "Reduce" | "reduce" => Ok(DecisionAction::Reduce),
+        "Close" | "close" => Ok(DecisionAction::Close),
+        "Hold" | "hold" => Ok(DecisionAction::Hold),
+        _ => Err(TgError::Validation(format!(
+            "unknown decision action: {value}"
+        ))),
+    }
+}
+
+fn order_side_to_str(side: OrderSide) -> &'static str {
+    match side {
+        OrderSide::Buy => "Buy",
+        OrderSide::Sell => "Sell",
+    }
+}
+
+fn order_side_from_str(value: &str) -> Result<OrderSide> {
+    match value {
+        "Buy" | "buy" => Ok(OrderSide::Buy),
+        "Sell" | "sell" => Ok(OrderSide::Sell),
+        _ => Err(TgError::Validation(format!("unknown order side: {value}"))),
+    }
 }
 
 fn snapshot_from_latest_row(row: sqlx::postgres::PgRow) -> Result<Snapshot> {

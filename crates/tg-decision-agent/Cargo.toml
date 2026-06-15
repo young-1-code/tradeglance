@@ -1,0 +1,25 @@
+[package]
+name = "tg-decision-agent"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+prost.workspace = true
+reqwest.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tg-contracts.workspace = true
+tg-persistence.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
