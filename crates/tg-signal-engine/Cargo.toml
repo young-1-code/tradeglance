@@ -1,0 +1,31 @@
+[package]
+name = "tg-signal-engine"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[lib]
+name = "tg_signal_engine"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tg-signal-engine"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+prost.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+tg-contracts.workspace = true
+tg-engine = { path = "../tg-engine" }
+tg-factor-engine = { path = "../tg-factor-engine" }
+thiserror.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tonic.workspace = true
+tracing.workspace = true

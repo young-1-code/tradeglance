@@ -3316,6 +3316,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-signal-engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "prost",
+ "rust_decimal",
+ "serde",
+ "tg-contracts",
+ "tg-engine",
+ "tg-factor-engine",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+]
+
+[[package]]
 name = "thiserror"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"

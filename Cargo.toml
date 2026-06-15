@@ -7,6 +7,7 @@ members = [
     "crates/tg-factor-engine",
     "crates/tg-engine",
     "crates/tg-backtest",
+    "crates/tg-signal-engine",
 ]
 
 [workspace.package]
