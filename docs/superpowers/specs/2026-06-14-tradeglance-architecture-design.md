@@ -20,6 +20,7 @@
 | 2026-06-14 | v0.8 | Phase 0 编码完成 | tg-contracts/tg-persistence/tg-market-data 三 crate 由 codex(gpt-5.5) 全自动实现 + 人工审阅（unit/clippy 全绿）并提交；cargo 镜像切换 rsproxy-sparse；集成测试(pg_integration)待 Postgres、真实 akshare 烟测 `#[ignore]`；环境备注：系统盘持续 ~98% 满，Phase 1 构建前需腾空间 |
 | 2026-06-14 | v0.9 | Phase 1 编码完成 | tg-factor-engine（Rust，10 tests）+ tg-indicators（C++20 gRPC，13 tests）由 codex 实现并提交；7 因子族 + 横截面 rank/IC/IR/decay/分层 + 11 指标齐备；磁盘腾出后平稳；跨服务 gRPC 联调（ADR-022 RSI 因子经 indicators）待接入 |
 | 2026-06-15 | v1.0 | Phase 2 编码完成 | tg-engine（事件驱动核心 4 tests）+ tg-backtest（历史回测+绩效 8 tests）+ tg-signal-engine（波段/T0/打板信号 4 tests）由 codex 实现并提交；ExecutionHandler/DataFeed 跨 crate 签名一致；策略 E2E 回测联调待 Phase 3 mock-order-engine 接入 |
+| 2026-06-15 | v1.1 | Phase 3 编码完成 | tg-decision-agent（LLM 决策层，8+1 tests）+ tg-mock-order-engine（模拟撮合+虚拟账户+A股规则，13 tests）由 codex 实现并提交；信号→决策→执行全链路代码闭环；ExecutionHandler 跨 backtest/mock 一致；全服务 E2E 联调待 Phase 4 compose |
 
 ---
 
@@ -459,7 +460,7 @@ Phase 4 可视编排  → monitoring-viz + infra
 | 0 | tg-contracts / tg-market-data / tg-persistence | ✅ 完成 | 🚧 三 crate 已实现+unit/clippy 绿（a9c72d3/4ecda53/7ae52e5）；集成测试待 Postgres |
 | 1 | tg-indicators / tg-factor-engine | ✅ 完成 | 🚧 已实现+tests 绿（4d40263/a616ee3）；跨服务 gRPC 联调待接入 |
 | 2 | tg-engine / tg-backtest / tg-signal-engine | ✅ 完成 | 🚧 已实现+tests 绿（9ff6cdd/49f8b52/5925abb）；E2E 策略回测联调待 Phase 3 |
-| 3 | tg-decision-agent / tg-mock-order-engine | ✅ 完成 | ⬜ 待启动 |
+| 3 | tg-decision-agent / tg-mock-order-engine | ✅ 完成 | 🚧 已实现+tests 绿（b1efdb8/51790fe）；全链路 E2E 联调待 Phase 4 compose |
 | 4 | tg-monitoring-viz / tg-infra | ✅ 完成 | ⬜ 待启动 |
 
 ## 11. 详细设计 Spec 索引
