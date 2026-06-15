@@ -9,6 +9,7 @@ members = [
     "crates/tg-backtest",
     "crates/tg-signal-engine",
     "crates/tg-decision-agent",
+    "crates/tg-mock-order-engine",
 ]
 
 [workspace.package]

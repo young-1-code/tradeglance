@@ -8,8 +8,9 @@ use sqlx::postgres::PgPoolOptions;
 use sqlx::types::Json;
 use sqlx::{PgPool, Row};
 use tg_contracts::{
-    Adjustment, AdjustmentFactor, Bar, BarQuery, Decision, DecisionAction, Instrument, OrderSide,
-    Result, RiskCheckResult, Snapshot, TgError, TradingCalendar,
+    Account, Adjustment, AdjustmentFactor, Bar, BarQuery, Decision, DecisionAction, Fill,
+    Instrument, Order, OrderSide, OrderStatus, OrderType, Result, RiskCheckResult, Snapshot,
+    StrategyStyle, TgError, TimeInForce, TradingCalendar,
 };
 
 use crate::adjust::adjust_bars;
@@ -105,6 +106,24 @@ pub trait DecisionRepo: Send + Sync {
         symbol: Option<&str>,
         limit: i64,
     ) -> Result<Vec<DecisionAuditRecord>>;
+}
+
+#[async_trait]
+pub trait OrderRepo: Send + Sync {
+    async fn save_order(&self, order: &Order) -> Result<()>;
+    async fn get_order(&self, id: &str) -> Result<Option<Order>>;
+    async fn list_open_orders(&self) -> Result<Vec<Order>>;
+}
+
+#[async_trait]
+pub trait FillRepo: Send + Sync {
+    async fn save_fill(&self, fill: &Fill) -> Result<()>;
+    async fn list_fills(&self, order_id: Option<&str>, limit: i64) -> Result<Vec<Fill>>;
+}
+
+#[async_trait]
+pub trait AccountStateRepo: Send + Sync {
+    async fn save_account(&self, account: &Account, trading_date: NaiveDate) -> Result<()>;
 }
 
 #[derive(Debug, Clone)]
@@ -589,6 +608,197 @@ impl DecisionRepo for PostgresStore {
     }
 }
 
+#[async_trait]
+impl OrderRepo for PostgresStore {
+    async fn save_order(&self, order: &Order) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO orders (
+                id, client_order_id, symbol, exchange, side, order_type, price,
+                quantity, time_in_force, strategy_tag, source, status,
+                filled_quantity, avg_fill_price, created_at, updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'agent', $11, $12, $13, $14, now())
+            ON CONFLICT (id) DO UPDATE SET
+                status = EXCLUDED.status,
+                filled_quantity = EXCLUDED.filled_quantity,
+                avg_fill_price = EXCLUDED.avg_fill_price,
+                updated_at = now()
+            "#,
+        )
+        .bind(&order.id)
+        .bind(&order.client_order_id)
+        .bind(&order.symbol)
+        .bind(exchange_to_str(order.exchange))
+        .bind(order_side_to_str(order.side))
+        .bind(order_type_to_str(order.order_type))
+        .bind(order.price)
+        .bind(order.quantity)
+        .bind(time_in_force_to_str(order.time_in_force))
+        .bind(strategy_style_to_str(order.strategy_tag))
+        .bind(order_status_to_str(order.status))
+        .bind(order.filled_quantity)
+        .bind(order.avg_fill_price)
+        .bind(order.created_at)
+        .execute(&self.pool)
+        .await
+        .map_err(other_error)?;
+        Ok(())
+    }
+
+    async fn get_order(&self, id: &str) -> Result<Option<Order>> {
+        let row = sqlx::query(
+            r#"
+            SELECT id, client_order_id, symbol, exchange, side, order_type, price,
+                   quantity, time_in_force, strategy_tag, status, filled_quantity,
+                   avg_fill_price, created_at
+            FROM orders
+            WHERE id = $1
+            "#,
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(other_error)?;
+
+        row.map(order_from_row).transpose()
+    }
+
+    async fn list_open_orders(&self) -> Result<Vec<Order>> {
+        let rows = sqlx::query(
+            r#"
+            SELECT id, client_order_id, symbol, exchange, side, order_type, price,
+                   quantity, time_in_force, strategy_tag, status, filled_quantity,
+                   avg_fill_price, created_at
+            FROM orders
+            WHERE status IN ('New', 'PartiallyFilled')
+            ORDER BY created_at, id
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(other_error)?;
+
+        rows.into_iter().map(order_from_row).collect()
+    }
+}
+
+#[async_trait]
+impl FillRepo for PostgresStore {
+    async fn save_fill(&self, fill: &Fill) -> Result<()> {
+        sqlx::query(
+            r#"
+            INSERT INTO fills (
+                fill_id, order_id, symbol, exchange, side, price, quantity,
+                commission, tax, transfer_fee, ts, trading_date
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ON CONFLICT (fill_id) DO NOTHING
+            "#,
+        )
+        .bind(&fill.fill_id)
+        .bind(&fill.order_id)
+        .bind(&fill.symbol)
+        .bind(exchange_to_str(fill.exchange))
+        .bind(order_side_to_str(fill.side))
+        .bind(fill.price)
+        .bind(fill.quantity)
+        .bind(fill.commission)
+        .bind(fill.tax)
+        .bind(fill.transfer_fee)
+        .bind(fill.ts)
+        .bind(fill.trading_date)
+        .execute(&self.pool)
+        .await
+        .map_err(other_error)?;
+        Ok(())
+    }
+
+    async fn list_fills(&self, order_id: Option<&str>, limit: i64) -> Result<Vec<Fill>> {
+        let limit = limit.clamp(1, 1000);
+        let rows = if let Some(order_id) = order_id {
+            sqlx::query(
+                r#"
+                SELECT fill_id, order_id, symbol, exchange, side, price, quantity,
+                       commission, tax, transfer_fee, ts, trading_date
+                FROM fills
+                WHERE order_id = $1
+                ORDER BY ts DESC, fill_id DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(order_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(other_error)?
+        } else {
+            sqlx::query(
+                r#"
+                SELECT fill_id, order_id, symbol, exchange, side, price, quantity,
+                       commission, tax, transfer_fee, ts, trading_date
+                FROM fills
+                ORDER BY ts DESC, fill_id DESC
+                LIMIT $1
+                "#,
+            )
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(other_error)?
+        };
+
+        rows.into_iter().map(fill_from_row).collect()
+    }
+}
+
+#[async_trait]
+impl AccountStateRepo for PostgresStore {
+    async fn save_account(&self, account: &Account, trading_date: NaiveDate) -> Result<()> {
+        let unrealized_pnl = account
+            .positions
+            .values()
+            .fold(Decimal::ZERO, |acc, position| acc + position.unrealized_pnl);
+        let mut tx = self.pool.begin().await.map_err(other_error)?;
+        sqlx::query(
+            r#"
+            INSERT INTO accounts (trading_date, cash, frozen_cash, total_value, unrealized_pnl)
+            VALUES ($1, $2, $3, $4, $5)
+            "#,
+        )
+        .bind(trading_date)
+        .bind(account.cash)
+        .bind(account.frozen_cash)
+        .bind(account.total_value)
+        .bind(unrealized_pnl)
+        .execute(&mut *tx)
+        .await
+        .map_err(other_error)?;
+
+        for position in account.positions.values() {
+            sqlx::query(
+                r#"
+                INSERT INTO positions (symbol, trading_date, quantity, avg_cost, updated_at)
+                VALUES ($1, $2, $3, $4, now())
+                ON CONFLICT (symbol, trading_date) DO UPDATE SET
+                    quantity = EXCLUDED.quantity,
+                    avg_cost = EXCLUDED.avg_cost,
+                    updated_at = now()
+                "#,
+            )
+            .bind(&position.symbol)
+            .bind(trading_date)
+            .bind(position.total_quantity)
+            .bind(position.avg_cost)
+            .execute(&mut *tx)
+            .await
+            .map_err(other_error)?;
+        }
+
+        tx.commit().await.map_err(other_error)
+    }
+}
+
 pub fn should_replace_latest_snapshot(
     existing_ts: Option<DateTime<Utc>>,
     incoming_ts: DateTime<Utc>,
@@ -746,6 +956,58 @@ fn decision_audit_from_row(row: sqlx::postgres::PgRow) -> Result<DecisionAuditRe
     })
 }
 
+fn order_from_row(row: sqlx::postgres::PgRow) -> Result<Order> {
+    let exchange = row.try_get::<String, _>("exchange").map_err(other_error)?;
+    let side = row.try_get::<String, _>("side").map_err(other_error)?;
+    let order_type = row
+        .try_get::<String, _>("order_type")
+        .map_err(other_error)?;
+    let time_in_force = row
+        .try_get::<String, _>("time_in_force")
+        .map_err(other_error)?;
+    let strategy_tag = row
+        .try_get::<String, _>("strategy_tag")
+        .map_err(other_error)?;
+    let status = row.try_get::<String, _>("status").map_err(other_error)?;
+
+    Ok(Order {
+        id: row.try_get("id").map_err(other_error)?,
+        client_order_id: row.try_get("client_order_id").map_err(other_error)?,
+        symbol: row.try_get("symbol").map_err(other_error)?,
+        exchange: exchange_from_str(&exchange)?,
+        side: order_side_from_str(&side)?,
+        order_type: order_type_from_str(&order_type)?,
+        price: row.try_get("price").map_err(other_error)?,
+        quantity: row.try_get("quantity").map_err(other_error)?,
+        time_in_force: time_in_force_from_str(&time_in_force)?,
+        strategy_tag: strategy_style_from_str(&strategy_tag)?,
+        created_at: row.try_get("created_at").map_err(other_error)?,
+        status: order_status_from_str(&status)?,
+        filled_quantity: row.try_get("filled_quantity").map_err(other_error)?,
+        avg_fill_price: row.try_get("avg_fill_price").map_err(other_error)?,
+    })
+}
+
+fn fill_from_row(row: sqlx::postgres::PgRow) -> Result<Fill> {
+    let exchange = row.try_get::<String, _>("exchange").map_err(other_error)?;
+    let side = row.try_get::<String, _>("side").map_err(other_error)?;
+
+    Ok(Fill {
+        fill_id: row.try_get("fill_id").map_err(other_error)?,
+        order_id: row.try_get("order_id").map_err(other_error)?,
+        symbol: row.try_get("symbol").map_err(other_error)?,
+        exchange: exchange_from_str(&exchange)?,
+        side: order_side_from_str(&side)?,
+        price: row.try_get("price").map_err(other_error)?,
+        quantity: row.try_get("quantity").map_err(other_error)?,
+        commission: row.try_get("commission").map_err(other_error)?,
+        tax: row.try_get("tax").map_err(other_error)?,
+        transfer_fee: row.try_get("transfer_fee").map_err(other_error)?,
+        ts: row.try_get("ts").map_err(other_error)?,
+        trading_date: row.try_get("trading_date").map_err(other_error)?,
+    })
+}
+
 fn decision_action_to_str(action: DecisionAction) -> &'static str {
     match action {
         DecisionAction::Open => "Open",
@@ -781,6 +1043,80 @@ fn order_side_from_str(value: &str) -> Result<OrderSide> {
         "Buy" | "buy" => Ok(OrderSide::Buy),
         "Sell" | "sell" => Ok(OrderSide::Sell),
         _ => Err(TgError::Validation(format!("unknown order side: {value}"))),
+    }
+}
+
+fn order_type_to_str(order_type: OrderType) -> &'static str {
+    match order_type {
+        OrderType::Limit => "Limit",
+        OrderType::Market => "Market",
+    }
+}
+
+fn order_type_from_str(value: &str) -> Result<OrderType> {
+    match value {
+        "Limit" | "limit" => Ok(OrderType::Limit),
+        "Market" | "market" => Ok(OrderType::Market),
+        _ => Err(TgError::Validation(format!("unknown order type: {value}"))),
+    }
+}
+
+fn time_in_force_to_str(time_in_force: TimeInForce) -> &'static str {
+    match time_in_force {
+        TimeInForce::Day => "Day",
+        TimeInForce::Gtc => "Gtc",
+    }
+}
+
+fn time_in_force_from_str(value: &str) -> Result<TimeInForce> {
+    match value {
+        "Day" | "day" => Ok(TimeInForce::Day),
+        "Gtc" | "gtc" | "GTC" => Ok(TimeInForce::Gtc),
+        _ => Err(TgError::Validation(format!(
+            "unknown time in force: {value}"
+        ))),
+    }
+}
+
+fn strategy_style_to_str(strategy: StrategyStyle) -> &'static str {
+    match strategy {
+        StrategyStyle::Swing => "Swing",
+        StrategyStyle::T0 => "T0",
+        StrategyStyle::LimitUp => "LimitUp",
+    }
+}
+
+fn strategy_style_from_str(value: &str) -> Result<StrategyStyle> {
+    match value {
+        "Swing" | "swing" => Ok(StrategyStyle::Swing),
+        "T0" | "t0" => Ok(StrategyStyle::T0),
+        "LimitUp" | "limitup" | "limit_up" => Ok(StrategyStyle::LimitUp),
+        _ => Err(TgError::Validation(format!(
+            "unknown strategy style: {value}"
+        ))),
+    }
+}
+
+fn order_status_to_str(status: OrderStatus) -> &'static str {
+    match status {
+        OrderStatus::New => "New",
+        OrderStatus::PartiallyFilled => "PartiallyFilled",
+        OrderStatus::Filled => "Filled",
+        OrderStatus::Cancelled => "Cancelled",
+        OrderStatus::Rejected => "Rejected",
+    }
+}
+
+fn order_status_from_str(value: &str) -> Result<OrderStatus> {
+    match value {
+        "New" | "new" => Ok(OrderStatus::New),
+        "PartiallyFilled" | "partially_filled" => Ok(OrderStatus::PartiallyFilled),
+        "Filled" | "filled" => Ok(OrderStatus::Filled),
+        "Cancelled" | "cancelled" | "canceled" => Ok(OrderStatus::Cancelled),
+        "Rejected" | "rejected" => Ok(OrderStatus::Rejected),
+        _ => Err(TgError::Validation(format!(
+            "unknown order status: {value}"
+        ))),
     }
 }
 

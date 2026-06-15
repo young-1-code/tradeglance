@@ -18,7 +18,7 @@ pub use parquet_io::{
     bar_partition_path, snapshot_partition_path, BarPartition, ParquetStore, SnapshotPartition,
 };
 pub use repo::{
-    should_replace_latest_snapshot, BacktestRunRecord, BacktestRunRepo, BarRepo, CalendarRepo,
-    DecisionAuditRecord, DecisionRepo, FactorRepo, InstrumentRepo, PostgresStore, SnapshotRepo,
-    WatchlistEntry,
+    should_replace_latest_snapshot, AccountStateRepo, BacktestRunRecord, BacktestRunRepo, BarRepo,
+    CalendarRepo, DecisionAuditRecord, DecisionRepo, FactorRepo, FillRepo, InstrumentRepo,
+    OrderRepo, PostgresStore, SnapshotRepo, WatchlistEntry,
 };

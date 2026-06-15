@@ -3318,6 +3318,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "tg-mock-order-engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "prost",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "tg-contracts",
+ "tg-engine",
+ "tg-persistence",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "tg-persistence"
 version = "0.1.0"
 dependencies = [
